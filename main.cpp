@@ -20,6 +20,7 @@ const char BoardChar = '#';
 bool isPaused = false;
 bool Auto = true;
 int blockType = 1;
+string playerName;
 
 
 struct PlayerScore {
@@ -58,6 +59,7 @@ string pipeName = "\\\\.\\pipe\\tetrispipe";
 
 bool CheckRotationCollision();
 void RotateBlock();
+bool LoadGameIfExists(const string& fileName);
 void SetConsoleColor(int textColor, int bgColor);
 void Input();
 void InitializeCurrentBlock();
@@ -74,6 +76,9 @@ void Input2();
 void InitializePipe();
 void Updatemulti(int &lastDropTime);
 void Input3();
+void SaveGameState(const string& fileName);
+bool DoesSaveGameExist(const string& fileName);
+
 
 struct Cell {
     bool isFilled;
@@ -236,6 +241,41 @@ void updateLeaderboard(const string &filename, const PlayerScore &player) {
 }
 
 
+bool LoadGameIfExists(const string& fileName) {
+    ifstream loadFile(fileName + "_save.txt");
+    if (loadFile.is_open()) {
+        // Load basic game state variables
+        loadFile >> score >> gameOver;
+        loadFile >> currentBlockColor >> nextBlockColor;
+
+        // Load the next block shape
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                loadFile >> nextBlock[i][j];
+            }
+        }
+
+        // Load the game board
+        for (int y = 0; y < BoardHeight; y++) {
+            for (int x = 0; x < BoardWidth; x++) {
+                loadFile >> board[y][x].isFilled >> board[y][x].color;
+            }
+        }
+        loadFile.close();
+
+        // Initialize a new current block since it's not saved
+        InitializeCurrentBlock();
+        currentX = BoardWidth / 2 - 2; // Center the new block.
+        currentY = 0; // Place the new block at the top of the board.
+
+        return true;
+    }
+    return false;
+}
+
+
+
+
 void showLeaderboard(const string &filename) {
     ifstream infile(filename);
     PlayerScore temp;
@@ -284,6 +324,14 @@ void InitializeGame() {
     GenerateNextBlock();
 }
 
+bool DoesSaveGameExist(const string& fileName) {
+    ifstream saveFile(fileName + "_save.txt");
+    if (saveFile.is_open()) {
+        saveFile.close();
+        return true;
+    }
+    return false;
+}
 
 bool CheckCollision(int dx, int dy, int tempBlock[4][4]) {
     for (int y = 0; y < 4; y++) {
@@ -328,6 +376,16 @@ void Input() {
             case 'p': // Pause or resume
                 isPaused = !isPaused;
                 break;
+            case 'c': // Save game
+                SaveGameState(playerName + "_save.txt");
+                gameOver == true;
+                break;
+            case 'e': // Exit game
+                gameOver = true;
+                break;
+            case 'r': // Restart game
+                InitializeGame();
+                break;
         }
     }
 }
@@ -351,6 +409,37 @@ void MergeBlockIntoBoard() {
         }
     }
 }
+void SaveGameState(const string& fileName) {
+    ofstream saveFile(fileName);
+    if (saveFile.is_open()) {
+        // Save basic game state variables
+        saveFile << score << " " << gameOver << " ";
+        saveFile << currentBlockColor << " " << nextBlockColor << endl;
+
+        // Save the next block shape
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                saveFile << nextBlock[i][j] << " ";
+            }
+        }
+        saveFile << endl;
+
+        // Save the game board
+        for (int y = 0; y < BoardHeight; y++) {
+            for (int x = 0; x < BoardWidth; x++) {
+                saveFile << board[y][x].isFilled << " " << board[y][x].color << " ";
+            }
+            saveFile << endl;
+        }
+
+        saveFile.close();
+        gameOver = true;
+    } else {
+        cout << "Unable to open file for saving!" << endl;
+    }
+}
+
+
 
 
 
@@ -554,7 +643,6 @@ void TetrisGameM(){
     cin >> difficultyLevel;
     delay = (difficultyLevel == 1) ? 500 : 250;
 
-    string playerName;
     cout << "Enter your name: ";
     cin >> playerName;
 
@@ -753,7 +841,6 @@ void TetrisGame(){
         delay = 250;
     }
 
-    string playerName;
     cout << "Enter your name: ";
     cin >> playerName;
 
@@ -766,7 +853,7 @@ void TetrisGame(){
 
     // Rest of the initialization...
     InitializeGame();
-
+    LoadGameIfExists(playerName);
     time_t startTime, endTime;
     startTime = time(nullptr); // Start time
 
@@ -881,11 +968,12 @@ int main(int argc, char* argv[]) {
 
     int menuin;
     cout << "1 - New Game" << '\n';
-    cout << "2 - How to Play" << '\n';
-    cout << "3 - Leaderboard" << '\n';
-    cout << "4 - Player vs Player" << '\n';
-    cout << "5 - manual Block" << '\n';
-    cout << "6 - Exit" << '\n';
+    cout << "2 - Load Game" << '\n';
+    cout << "3 - How to Play" << '\n';
+    cout << "4 - Leaderboard" << '\n';
+    cout << "5 - Player vs Player" << '\n';
+    cout << "6 - manual Block" << '\n';
+    cout << "7 - Exit" << '\n';
     cin >> menuin;
 
 
@@ -896,13 +984,13 @@ int main(int argc, char* argv[]) {
             main(argc , argv) ;
             break;
         }
-        case 2:{
+        case 3:{
             showHowToPlay();
 
             main(argc , argv) ;
             break;
         }
-        case 3: {
+        case 4: {
             // Optionally, show leaderboard
             cout << "difficulty level 1 2";
             int showLB;
@@ -912,21 +1000,32 @@ int main(int argc, char* argv[]) {
             main(argc , argv);
             break;
         }
-        case 6:{
+        case 7:{
             cout << "thanks for playing";
             return 0;
         }
-        case 4:{
+        case 5:{
             system("start cmd.exe /k .\\a.exe run_game");
             system("start cmd.exe /k .\\a.exe run_game");
             return 0;
         }
-        case 5:{
+        case 6:{
             TetrisM();
             main(argc , argv);
             break;
         }
-    }
-    return 0;
+        case 2:{
+            cout << " what is name you playd and save you're game\n";
+            cin >> playerName;
+            if (DoesSaveGameExist(playerName)){
+                TetrisGame();
+            }else{
+                cout << "there is no save for this name";
+                main(argc , argv);
+            }
+            break;
+        }
+            return 0;
 
+    }
 }
